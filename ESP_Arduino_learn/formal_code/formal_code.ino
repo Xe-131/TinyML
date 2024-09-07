@@ -75,6 +75,7 @@ void task1(void* parameters){
     else{
       // 在timeout 内数组没有FFT 完成
       Serial.println("task1 get no key");
+      
     }
   }
 }
