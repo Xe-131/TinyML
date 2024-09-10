@@ -1,14 +1,7 @@
-#include <ESP_I2S.h>
-#include "arduinoFFT.h"
-// #include "Task1.h"
-// #include "common.h"
+#include "Task2.h"
+#include "Task1.h"
+#include "common.h"
 
-#define SAMPLERATE 8000
-// 频谱图样本数 = WINDOWSIZE + (STEPNUM-1) * WINDOWSTEP
-#define WINDOWSIZE 128   // 一次FFT 的样本数，必须是2 的幂
-#define WINDOWSTEP 64  // 步长
-#define WINDOWNUM 124   // 总窗个数
-#define FREQENCENUM 64 // 单窗的频率分量个数，WINDOWSIZE/2 为有效量，轴对称
 
 // 时域信号(队列)
 StaticQueue_t waveform_QueueControlBlock;
@@ -53,6 +46,7 @@ void setup() {
   waveform = (uint8_t*)ps_malloc(WINDOWSTEP*2 * sizeof(int)); // 时域信号(队列)
   spectrogram = (unsigned int*)ps_malloc(WINDOWNUM*FREQENCENUM * sizeof(unsigned int)); // 频域信号（变量）
   xQueue_waveform = xQueueCreateStatic(WINDOWSTEP*2, sizeof(int), waveform, &waveform_QueueControlBlock);
+  
   if(xQueue_waveform != NULL){
     Serial.println("waveform 队列创建成功");
   }
@@ -62,97 +56,12 @@ void setup() {
 
   xTaskCreatePinnedToCore(Task1, "iis mic", 1024*3, NULL, 1, NULL, 1);
   vTaskDelay(30); // 先让mic 采集数据
-  xTaskCreatePinnedToCore(task2, "FFT", 1024*6, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(Task2, "FFT", 1024*6, NULL, 1, NULL, 1);
 
 
 }
 
 
-
-
-// 麦克风一次收集一个STEP 的数据量
-void Task1(void* parameters){
-  Serial.printf("task1 running in %d\n", xPortGetCoreID());
-
-  I2SClass I2S;
-  int sample = 0;
-
-  // 初始化mic
-  I2S.setPins(41, 42, -1, 2, -1);  //SCK, WS, SDOUT, SDIN, MCLK
-  I2S.begin(I2S_MODE_STD, SAMPLERATE, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO, -1);
-
-  while(1){
-    // 采集数据
-    for(int i = 0; i < WINDOWSTEP; i++){
-      while(1){
-        sample = I2S.read();
-        if((sample != 0) && (sample != -1)){
-          break;
-        }
-      }
-      sample >>= 8;
-      // 向队列发送数据
-      if(xQueueSend(xQueue_waveform, &sample, wave_queue_timeout) == pdPASS){
-      }
-      else{
-        Serial.printf("waveform 队列已满超过 %d ms\n", wave_queue_timeout);
-      }
-    }
-
-
-  }
-}
-
-// FFT 操作需要整个窗口的数据
-void task2(void* parameters){
-  Serial.printf("task2 running in %d\n", xPortGetCoreID());
-
-  // FFT 计算所用buffer
-  double* vReal = (double*)ps_malloc(WINDOWSIZE * sizeof(double));
-  double* vImag = (double*)ps_malloc(WINDOWSIZE * sizeof(double));
-  // 寄存一个window 的时域信号
-  int* window_wave = (int*)ps_malloc(WINDOWSIZE * sizeof(int));
-
-  ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, WINDOWSIZE, SAMPLERATE);
-
-  while(1){
- 
-    // 更新时域信号到window_wave(使用队列)
-    buffer_shift(xQueue_waveform, window_wave, WINDOWSTEP, WINDOWSIZE, wave_queue_timeout);
-
-    // 复制到vReal
-    for(int i = 0; i < WINDOWSIZE; i++){
-      vReal[i] = (double)window_wave[i];
-    }
-    // 初始化虚数
-    for(int i = 0; i < WINDOWSIZE; i++){
-      vImag[i] = 0;
-    }
- 
-
-    // 进行FFT 操作
-    FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);
-    FFT.compute(FFTDirection::Forward);
-    FFT.complexToMagnitude();
-    
-    // 更新公共频谱图（数据移位）
-    buffer_update(vReal, spectrogram, WINDOWSIZE, WINDOWNUM*FREQENCENUM, &xMutexInventory_2);
-    if(temp > 123){
-      Serial.println(temp);
-    }
-    
-    temp++;
-    // Serial.println("\n\n\n\n\n");
-    // // 打印频谱图
-    // for(int i = 0; i < WINDOWNUM*FREQENCENUM; i++){
-    //   if(i % 100 == 0){
-    //     Serial.printf("i = %d %d\n", i, spectrogram[i]);
-    //   }
-    // }     
-    
-
-  }
-}
 
 /* 将from 数组左移，丢弃最左边的数据，最右边更新新的数据*/
 void buffer_update(double* from, unsigned int* to, int from_size, int to_size, SemaphoreHandle_t* key){
