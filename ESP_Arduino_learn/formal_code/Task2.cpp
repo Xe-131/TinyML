@@ -1,11 +1,10 @@
-#include "Task2.h"
 #include <Arduino.h> 
 #include "common.h"
 #include "arduinoFFT.h"
 
 // FFT 操作需要整个窗口的数据
 void Task2(void* parameters){
-  Serial.printf("task2 running in %d\n", xPortGetCoreID());
+  Serial.printf("\n\n\nTask2 running in %d\n", xPortGetCoreID());
 
   // FFT 计算所用buffer
   double* vReal = (double*)ps_malloc(WINDOWSIZE * sizeof(double));
@@ -37,11 +36,13 @@ void Task2(void* parameters){
     
     // 更新公共频谱图（数据移位）
     buffer_update(vReal, spectrogram, WINDOWSIZE, WINDOWNUM*FREQENCENUM, &xMutexInventory_2);
-    if(temp > 123){
+   
+    // 测试时长
+    if(temp % 124 == 0){
       Serial.println(temp);
     }
-    
     temp++;
+
     // Serial.println("\n\n\n\n\n");
     // // 打印频谱图
     // for(int i = 0; i < WINDOWNUM*FREQENCENUM; i++){

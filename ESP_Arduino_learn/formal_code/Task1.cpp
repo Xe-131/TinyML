@@ -1,11 +1,10 @@
-#include "Task1.h"
 #include <Arduino.h> 
 #include <ESP_I2S.h>
 #include "common.h"
 
 // 麦克风一次收集一个STEP 的数据量
 void Task1(void* parameters){
-  Serial.printf("task1 running in %d\n", xPortGetCoreID());
+  Serial.printf("\n\n\nTask1 running in %d\n", xPortGetCoreID());
 
   I2SClass I2S;
   int sample = 0;

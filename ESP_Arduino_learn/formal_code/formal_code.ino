@@ -2,6 +2,8 @@
 #include "Task1.h"
 #include "common.h"
 
+// 初始化模型数组
+#include "MODEL_QUANT_TFLITE_8000.h"
 
 // 时域信号(队列)
 StaticQueue_t waveform_QueueControlBlock;
@@ -57,8 +59,11 @@ void setup() {
   xTaskCreatePinnedToCore(Task1, "iis mic", 1024*3, NULL, 1, NULL, 1);
   vTaskDelay(30); // 先让mic 采集数据
   xTaskCreatePinnedToCore(Task2, "FFT", 1024*6, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(Task3, "modle inference", 1024*6, NULL, 1, NULL, 1);
 
-
+  // 结束setloop 任务，减少资源消耗
+  vTaskDelay(1000);
+  vTaskDelete(NULL);
 }
 
 
