@@ -39,7 +39,7 @@ void Task2(void* parameters){
    
     // 测试时长
     if(temp % 124 == 0){
-      Serial.println(temp);
+      Serial.println("计算完一秒的数据");
     }
     temp++;
 
