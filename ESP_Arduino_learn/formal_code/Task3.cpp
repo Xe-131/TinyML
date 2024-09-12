@@ -44,19 +44,19 @@ void Task3(void* parameters){
     return;
   }
   // 创建resolver : 如何根据模型的结构添加合适的操作？
-  static tflite::MicroMutableOpResolver<9> resolver;
-  if(resolver.AddDepthwiseConv2D() != kTfLiteOk){
-    Serial.println("resolver.AddDepthwiseConv2D() != KTfLiteOK");
-    return;
-  }
+  static tflite::MicroMutableOpResolver<7> resolver;
+  // if(resolver.AddDepthwiseConv2D() != kTfLiteOk){
+  //   Serial.println("resolver.AddDepthwiseConv2D() != KTfLiteOK");
+  //   return;
+  // }
   if(resolver.AddFullyConnected() != kTfLiteOk){
     Serial.println("resolver.AddFullyConnected() != KTfLiteOK");
     return;    
   }
-  if(resolver.AddSoftmax() != kTfLiteOk){
-    Serial.println("resolver.AddSoftmax() != KTfLiteOK");
-    return;
-  }
+  // if(resolver.AddSoftmax() != kTfLiteOk){
+  //   Serial.println("resolver.AddSoftmax() != KTfLiteOK");
+  //   return;
+  // }
   if(resolver.AddReshape() != kTfLiteOk){
     Serial.println("resolver.AddReshape() != KTfLiteOK");
     return;    
@@ -111,7 +111,7 @@ void Task3(void* parameters){
     // 输入
     if(xSemaphoreTake(xMutexInventory_2, timeout) == pdPASS){
       for(int i = 0; i < WINDOWNUM*FREQENCENUM; i++){
-        input->data.f[i] = (float)spectrogram[i]/50000.0;
+        input->data.f[i] = (float)spectrogram[i];
         // Serial.println(input->data.f[i], 8);
       }
       // 释放钥匙
@@ -121,6 +121,29 @@ void Task3(void* parameters){
       Serial.printf("model 在%d内未获得钥匙", timeout);
       continue;
     }   
+
+    // // 测试直接频谱图输入
+    // static int time = 1;
+    // static float* temp_p = NULL;
+    // if(time == 1){
+    //   temp_p = (float*)cat;
+    //   time++;
+    // }
+    // else if(time == 2){
+    //   temp_p = (float*)bed;
+    //   time++;
+    // }
+    // else if(time == 3){
+    //   temp_p = (float*)dog;
+    //   time++;
+    // }
+    // else if(time == 4){
+    //   temp_p = (float*)bird;
+    //   time = 1;
+    // }
+    // for(int i = 0; i < 8060; i++){
+    //   input->data.f[i] = temp_p[i];
+    // }
 
     // 推断
     TfLiteStatus invoke_status = interpreter->Invoke();
@@ -158,8 +181,10 @@ void Task3(void* parameters){
     else if(max_index == 3){
       Serial.println("dog");
     }
-    Serial.printf("%6f %6f %6f %6f", output->data.f[0], output->data.f[1], output->data.f[2], output->data.f[3]);
+    Serial.printf("%6f %6f %6f %6f\n", output->data.f[0], output->data.f[1], output->data.f[2], output->data.f[3]);
 
+    // 喂狗
+    vTaskDelay(1);
   }
 
 }

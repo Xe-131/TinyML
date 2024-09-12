@@ -12,7 +12,7 @@ uint8_t* waveform = NULL;
 #define wave_queue_timeout 1000
 
 // 频域信号
-unsigned int* spectrogram = NULL;
+float* spectrogram = NULL;
 
 // 声明互斥锁
 SemaphoreHandle_t xMutexInventory_1 = NULL;
@@ -45,9 +45,9 @@ void setup() {
     Serial.println("No Enough Ram For Mutex");
   }
   // 全局变量的内存分配
-  waveform = (uint8_t*)ps_malloc(WINDOWSTEP*2 * sizeof(int)); // 时域信号(队列)
-  spectrogram = (unsigned int*)ps_malloc(WINDOWNUM*FREQENCENUM * sizeof(unsigned int)); // 频域信号（变量）
-  xQueue_waveform = xQueueCreateStatic(WINDOWSTEP*2, sizeof(int), waveform, &waveform_QueueControlBlock);
+  waveform = (uint8_t*)ps_malloc(WINDOWSTEP*2 * sizeof(float)); // 时域信号(队列)
+  spectrogram = (float*)ps_malloc(WINDOWNUM*FREQENCENUM * sizeof(float)); // 频域信号（变量）
+  xQueue_waveform = xQueueCreateStatic(WINDOWSTEP*2, sizeof(float), waveform, &waveform_QueueControlBlock);
   
   if(xQueue_waveform != NULL){
     Serial.println("waveform 队列创建成功");
@@ -59,7 +59,7 @@ void setup() {
   xTaskCreatePinnedToCore(Task1, "iis mic", 1024*3, NULL, 1, NULL, 1);
   vTaskDelay(30); // 先让mic 采集数据
   xTaskCreatePinnedToCore(Task2, "FFT", 1024*6, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(Task3, "modle inference", 1024*6, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(Task3, "modle inference", 1024*6, NULL, 1, NULL, 0);
 
   // 结束setloop 任务，减少资源消耗
   vTaskDelay(1000);
@@ -69,7 +69,7 @@ void setup() {
 
 
 /* 将from 数组左移，丢弃最左边的数据，最右边更新新的数据*/
-void buffer_update(double* from, unsigned int* to, int from_size, int to_size, SemaphoreHandle_t* key){
+void buffer_update(double* from, float* to, int from_size, int to_size, SemaphoreHandle_t* key){
   if(from_size >= to_size){
     Serial.println("buffer_update went wrong !");
     return;
@@ -82,7 +82,7 @@ void buffer_update(double* from, unsigned int* to, int from_size, int to_size, S
   // 加入新的数据(公共区)
   if(xSemaphoreTake(*key, timeout) == pdPASS){
     while(1){
-      to[to_size-1] = (unsigned int)from[from_size-1];
+      to[to_size-1] = (float)from[from_size-1];
       to_size--;
       from_size--;
       if(from_size == 0){
@@ -98,7 +98,7 @@ void buffer_update(double* from, unsigned int* to, int from_size, int to_size, S
 
 }
 
-void buffer_shift(QueueHandle_t queue, int* buffer, int shift_size, int buffer_size, int queue_timeout){
+void buffer_shift(QueueHandle_t queue, float* buffer, int shift_size, int buffer_size, int queue_timeout){
   if(shift_size >= buffer_size){
     Serial.println("buffer_shift went wrong !");
     return;

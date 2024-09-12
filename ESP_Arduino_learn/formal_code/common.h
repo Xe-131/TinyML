@@ -5,6 +5,14 @@
 
 extern const unsigned char MODEL_QUANT_TFLITE_8000_FLASH_1[1632408];
 extern const unsigned int MODEL_QUANT_TFLITE_8000_len_1;
+extern const float cat[8060];
+extern const float bed[8060];
+extern const float bird[8060];
+extern const float dog[8060];
+extern const float bed_wave[8000];
+extern const float cat_wave[8000];
+extern const float dog_wave[8000];
+extern const float bird_wave[8000];
 
 #define SAMPLERATE 8000
 // 频谱图样本数 = WINDOWSIZE + (STEPNUM-1) * WINDOWSTEP
@@ -20,7 +28,7 @@ extern uint8_t* waveform;
 #define wave_queue_timeout 1000
 
 // 频域信号
-extern unsigned int* spectrogram;
+extern float* spectrogram;
 
 // 声明互斥锁
 extern SemaphoreHandle_t xMutexInventory_1;
@@ -40,7 +48,7 @@ void Task3(void* parameters);
 
 // 其他函数
 /* 将from 数组左移，丢弃最左边的数据，最右边更新新的数据*/
-void buffer_update(double* from, unsigned int* to, int from_size, int to_size, SemaphoreHandle_t* key);
-void buffer_shift(QueueHandle_t queue, int* buffer, int shift_size, int buffer_size, int queue_timeout);
+void buffer_update(double* from, float* to, int from_size, int to_size, SemaphoreHandle_t* key);
+void buffer_shift(QueueHandle_t queue, float* buffer, int shift_size, int buffer_size, int queue_timeout);
 
 #endif
