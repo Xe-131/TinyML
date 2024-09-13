@@ -1,4 +1,3 @@
-#include "HardwareSerial.h"
 // 需要先包含Arduino.h 这里面包括了freeRTos 以及一些基本类型定义
 #include <Arduino.h> 
 #include "common.h"
@@ -6,6 +5,7 @@
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/system_setup.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+
 
 #define MODEL_QUANT_TFLITE_8000_LEN 1632408
 
@@ -16,8 +16,8 @@ tflite::MicroInterpreter *interpreter = nullptr;
 TfLiteTensor *input = nullptr;
 TfLiteTensor *output = nullptr;
 int inference_count = 0;
-// 这个量决定了模型能不能跑起来
-constexpr int kTensorArenaSize = 200000;
+// 这个量决定了模型能不能跑起来，分配在内部RAM
+constexpr int kTensorArenaSize = 100000;
 uint8_t tensor_arena[kTensorArenaSize];
 } 
 
@@ -103,24 +103,40 @@ void Task3(void* parameters){
   // 确认是.f ???
   input_buffer = input->data.f;
 
-  Serial.println("\n模型初始化完成\n\n");
+  Serial.println("\n------------------------模型初始化完成------------------------\n\n");
 
-
+  // 频谱图缓冲区
+  float* spectrogram_buffer;
+  spectrogram_buffer = (float*)ps_malloc(WINDOWNUM*MELNUM * sizeof(float));
+  
   while(1){
-
-    // 输入
-    if(xSemaphoreTake(xMutexInventory_2, timeout) == pdPASS){
-      for(int i = 0; i < WINDOWNUM*FREQENCENUM; i++){
-        input->data.f[i] = (float)spectrogram[i];
-        // Serial.println(input->data.f[i], 8);
-      }
-      // 释放钥匙
-      xSemaphoreGive(xMutexInventory_2);
+    // 向左移位
+    for(int i = 0; i <= (WINDOWNUM-1)*MELNUM-1; i++){
+      spectrogram_buffer[i] = spectrogram_buffer[i+MELNUM];
     }
-    else{
-      Serial.printf("model 在%d内未获得钥匙", timeout);
-      continue;
-    }   
+    // 从队列读一个mel_num 的数据
+    for(int i = (WINDOWNUM-1)*MELNUM; i < WINDOWNUM*MELNUM; i++){
+      if(xQueueReceive(xQueue_spectrogram, spectrogram_buffer + i, spectrogram_queue_timeout) == pdPASS){
+      }
+      else{
+        Serial.printf("waveform 队列已满超过 %d ms\n", spectrogram_queue_timeout);
+      }
+    }
+    // 输入
+    for(int i = 0; i < WINDOWNUM*MELNUM; i++){
+      input->data.f[i] = spectrogram_buffer[i];
+    }
+
+    // 测试这边收到的频谱图与隔壁发送的频谱图是否一致
+//     static int j = -1;
+// Serial.println("-----------------");
+//     for(int i = (WINDOWNUM-1)*MELNUM; i < WINDOWNUM*MELNUM; i++){
+//       Serial.printf("j = %d i = %d  %6f\n", j, i-3840, spectrogram_buffer[i]);
+//     }
+//     j++;
+// Serial.println("-----------------");
+//     vTaskDelay(1000);
+
 
     // // 测试直接频谱图输入
     // static int time = 1;
@@ -141,7 +157,7 @@ void Task3(void* parameters){
     //   temp_p = (float*)bird;
     //   time = 1;
     // }
-    // for(int i = 0; i < 8060; i++){
+    // for(int i = 0; i < 3904; i++){
     //   input->data.f[i] = temp_p[i];
     // }
 
@@ -159,6 +175,7 @@ void Task3(void* parameters){
     //   Serial.println("output->type != kTfLiteFloat32");
     // }
     
+
 
     // 打印输出
     float max_value = -1000000;
