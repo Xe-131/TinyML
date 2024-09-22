@@ -2,6 +2,7 @@
 #include <Arduino.h> 
 #include "common.h"
 #include "arduinoFFT.h"
+#include "model.h"
 
 // FFT 操作需要整个窗口的数据
 void Task2(void* parameters){
@@ -17,31 +18,17 @@ void Task2(void* parameters){
 
   while(1){
  
-    // // // 更新时域信号到window_wave(使用队列)
-    // // buffer_shift(xQueue_waveform, window_wave, WINDOWSTEP, WINDOWSIZE, wave_queue_timeout);
-
-    // static int num_count = 0;
-    // Serial.println("-----------------");
-    // for(int i = 0; i < WINDOWSIZE; i++){
-    //   Serial.printf("i = %d  ", i+num_count-256);
-    //   Serial.println(window_wave[i], 6);
-    // }
-    // Serial.println("-----------------");
-    // num_count = num_count + 128;
-    // vTaskDelay(1000);
-
-    // 测试: 更新音频数据到window_wave
-    static int index = 0;
+    // 将麦克风音频从队列中读出
     // 移位
     for(int i = 0; i <= WINDOWSIZE-WINDOWSTEP-1; i++){
       window_wave[i] = window_wave[i + WINDOWSTEP];
     }
     // 赋新值
     for(int i = WINDOWSIZE-WINDOWSTEP; i < WINDOWSIZE; i++){
-      window_wave[i] = bird_wave[index];
-      index++;
-      if(index == 8000){
-        index = 0;
+      if(xQueueReceive(xQueue_waveform ,window_wave+i , wave_queue_timeout) == pdPASS){
+      }
+      else{
+        Serial.printf("waveform 队列已空超过 %d ms\n", wave_queue_timeout);
       }
     }
 
@@ -54,29 +41,35 @@ void Task2(void* parameters){
       vImag[i] = 0;
     }
  
-
     // 进行FFT 操作
     FFT.windowing(FFTWindow::Hann, FFTDirection::Forward);
     FFT.compute(FFTDirection::Forward);
     FFT.complexToMagnitude();
     
-    // 只保留部分频率桶（梅尔）
+    // // 只保留部分频率桶（梅尔）：未归一化版本
+    // static float mel_frequence[MELNUM] = {0};
+    // for(int i = 0; i < MELNUM; i++){
+    //   mel_frequence[i] = (float)vReal[mel_index[i]];
+    // }
+
+    // 归一化版本
     static float mel_frequence[MELNUM] = {0};
-    for(int i = 0; i < MELNUM; i++){
-      mel_frequence[i] = (float)vReal[mel_index[i]];
+    float min_val = vReal[mel_index[0]];
+    float max_val = vReal[mel_index[0]];
+    for (int i = 0; i < MELNUM; i++) {
+        float value = (float)vReal[mel_index[i]];
+        mel_frequence[i] = value;
+        if (value < min_val) {
+            min_val = value;
+        }
+        if (value > max_val) {
+            max_val = value;
+        }
     }
-
-//     // 测试
-//     static int j = -1;
-// Serial.println("-----------------");
-//     for(int i = 0; i < MELNUM; i++){
-//       Serial.printf("j = %d i = %d  %6f\n", j, i, vReal[i]);
-//     }
-//     j++;
-// Serial.println("-----------------");
-//     vTaskDelay(1000);
-   
-
+    // 对 mel_frequence 数组进行归一化
+    for (int i = 0; i < MELNUM; i++) {
+        mel_frequence[i] = (mel_frequence[i] - min_val) / (max_val - min_val + 1e-6);
+    }
 
     // 将MLENUM 个频率发送到队列:大坑，注意队列默认一次传输4 个字节，而vReal 是double 类型（8 个字节）
     for(int i = 0; i < MELNUM; i++){
@@ -87,40 +80,16 @@ void Task2(void* parameters){
       }         
     }
 
-    // // 测试：直接把真实频谱图的值赋给vReal, 舍弃实际计算的值
-    // static float* animal_p_2 = (float*)bed;
-    // static int index_2 = 0;
-    // for(int i = 0; i < MELNUM; i++){
-    //   if(xQueueSend(xQueue_spectrogram, animal_p_2 + index_2, spectrogram_queue_timeout) == pdPASS){
-    //   }
-    //   else{
-    //     Serial.printf("spectrogram 队列已满超过 %d ms\n", spectrogram_queue_timeout);
-    //   }     
-    //   index_2++;
-
-    //   if(index_2 == 3904){
-    //     index_2 = 0;
-    //   }
+    // // (共61列)
+    // static int task2_temp = 0;
+    // task2_temp++;
+    // if(task2_temp == 61){
+    //   task2_temp = 0;
+    //   Serial.println("Task2 生成一张频谱图");
     // }
-
-
-
-
-
-    // 测试时长
-    // if(temp % WINDOWNUM == 0){
-    //   Serial.println("计算完一秒的数据");
-    // }
-    // temp++;
-
-    // Serial.println("\n\n\n\n\n");
-    // // 打印频谱图
-    // for(int i = 0; i < WINDOWNUM*FREQENCENUM; i++){
-    //   if(i % 100 == 0){
-    //     Serial.printf("i = %d %f\n", i, spectrogram[i]);
-    //   }
-    // }     
     
+
+  
 
   }
 }
