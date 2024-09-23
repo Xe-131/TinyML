@@ -4,7 +4,12 @@
 #include "arduinoFFT.h"
 #include "model.h"
 
-// FFT 操作需要整个窗口的数据
+// 保留的频率索引
+int mel_index[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+  22, 23, 24, 25, 27, 28, 30, 31, 33, 34, 36, 38, 40, 41, 43, 45, 47, 50, 52, 54, 56, 59, 61, 63,
+  66, 69, 71, 74, 77, 80, 83, 86, 90, 93, 96, 100, 104, 107, 111, 115, 120, 124};
+
+// 将一个窗口的数据进行FFT
 void Task2(void* parameters){
   Serial.printf("\n\n\nTask2 running in %d\n", xPortGetCoreID());
 
@@ -13,7 +18,7 @@ void Task2(void* parameters){
   double* vImag = (double*)ps_malloc(WINDOWSIZE * sizeof(double));
   // 寄存一个window 的时域信号
   float* window_wave = (float*)ps_malloc(WINDOWSIZE * sizeof(float));
-
+  // FFT 初始化
   ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, WINDOWSIZE, SAMPLERATE);
 
   while(1){
@@ -80,16 +85,17 @@ void Task2(void* parameters){
       }         
     }
 
-    // // (共61列)
-    // static int task2_temp = 0;
-    // task2_temp++;
-    // if(task2_temp == 61){
-    //   task2_temp = 0;
-    //   Serial.println("Task2 生成一张频谱图");
-    // }
-    
-
-  
+    #ifdef TIME_TEST
+    // 时间测试
+    static int task2_count = 0;
+    static int task2_time = 0;
+    task2_count++;
+    if(task2_count == WINDOWNUM){
+      task2_count = 0;
+      Serial.printf("Task2 生成一张频谱图耗时：%d\n", millis()-task2_time);
+      task2_time = millis();
+    }
+    #endif    
 
   }
 }

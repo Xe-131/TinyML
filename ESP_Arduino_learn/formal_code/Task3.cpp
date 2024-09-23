@@ -12,66 +12,54 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 
 
-#define MODEL_QUANT_TFLITE_8000_LEN 1632408
 
 // 没有名字的命名空间，限制以下这些变量只能在本文件中使用
 namespace {
-const tflite::Model *model = nullptr;
-tflite::MicroInterpreter *interpreter = nullptr;
-TfLiteTensor *input = nullptr;
-TfLiteTensor *output = nullptr;
-int inference_count = 0;
-// 这个量决定了模型能不能跑起来，分配在内部RAM
-constexpr int kTensorArenaSize = 240000;
-uint8_t tensor_arena[kTensorArenaSize];
+  const tflite::Model *model = nullptr;
+  tflite::MicroInterpreter *interpreter = nullptr;
+  TfLiteTensor *input = nullptr;
+  TfLiteTensor *output = nullptr;
+  // 模型推断时所有张量的分配空间
+  constexpr int kTensorArenaSize = 240000;
+  uint8_t tensor_arena[kTensorArenaSize];
 } 
 
-float* input_buffer = NULL;
 
+// 打印输出
 void result_handle(TfLiteTensor *output);
 
 void Task3(void* parameters){
   Serial.printf("\n\n\nTask3 running in %d\n", xPortGetCoreID());
 
-
-  // 从PSRAM 中构建模
-  Serial.printf("\nPSRAM Size: %u bytes\n", ESP.getPsramSize());
-  // 将模型从FLASH 中加载到PSRAM
-  unsigned char* MODEL_QUANT_TFLITE_8000_PSRAM = (unsigned char*)ps_malloc(MODEL_QUANT_TFLITE_8000_LEN*sizeof(unsigned char));
-  for(int i = 0; i < MODEL_QUANT_TFLITE_8000_LEN; i++){
-    MODEL_QUANT_TFLITE_8000_PSRAM[i] = MODEL_QUANT_TFLITE_8000_FLASH_1[i];
-  }
-  // 构建模型
-  model = tflite::GetModel(MODEL_QUANT_TFLITE_8000_PSRAM);
-  if(model->version() != TFLITE_SCHEMA_VERSION){
-    Serial.printf("\n\nModel provided is schema version %d not equal to supported version %d.\n\n", model->version(), TFLITE_SCHEMA_VERSION);
-    return;
-  }
-  // 获取 PSRAM 剩余内存
-  Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-  
-  // // 从FLASH 中构建模型
-  // model = tflite::GetModel(MODEL_QUANT_TFLITE_8000_FLASH_1);
+  // // 从PSRAM 中构建模型
+  // Serial.printf("\nPSRAM Size: %u bytes\n", ESP.getPsramSize());
+  // // 将模型从FLASH 中加载到PSRAM
+  // unsigned char* MODEL_QUANT_TFLITE_8000_PSRAM = (unsigned char*)ps_malloc(MODEL_QUANT_TFLITE_8000_len_1*sizeof(unsigned char));
+  // for(int i = 0; i < MODEL_QUANT_TFLITE_8000_len_1; i++){
+  //   MODEL_QUANT_TFLITE_8000_PSRAM[i] = MODEL_QUANT_TFLITE_8000_FLASH_1[i];
+  // }
+  // // 构建模型
+  // model = tflite::GetModel(MODEL_QUANT_TFLITE_8000_PSRAM);
   // if(model->version() != TFLITE_SCHEMA_VERSION){
   //   Serial.printf("\n\nModel provided is schema version %d not equal to supported version %d.\n\n", model->version(), TFLITE_SCHEMA_VERSION);
   //   return;
   // }
-
+  // // 获取 PSRAM 剩余内存
+  // Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+  
+  // 从FLASH 中构建模型
+  model = tflite::GetModel(MODEL_QUANT_TFLITE_8000_FLASH_1);
+  if(model->version() != TFLITE_SCHEMA_VERSION){
+    Serial.printf("\n\nModel provided is schema version %d not equal to supported version %d.\n\n", model->version(), TFLITE_SCHEMA_VERSION);
+    return;
+  }
 
   // 创建resolver : 如何根据模型的结构添加合适的操作？
   static tflite::MicroMutableOpResolver<7> resolver;
-  // if(resolver.AddDepthwiseConv2D() != kTfLiteOk){
-  //   Serial.println("resolver.AddDepthwiseConv2D() != KTfLiteOK");
-  //   return;
-  // }
   if(resolver.AddFullyConnected() != kTfLiteOk){
     Serial.println("resolver.AddFullyConnected() != KTfLiteOK");
     return;    
   }
-  // if(resolver.AddSoftmax() != kTfLiteOk){
-  //   Serial.println("resolver.AddSoftmax() != KTfLiteOK");
-  //   return;
-  // }
   if(resolver.AddReshape() != kTfLiteOk){
     Serial.println("resolver.AddReshape() != KTfLiteOK");
     return;    
@@ -109,14 +97,12 @@ void Task3(void* parameters){
   input = interpreter->input(0);
   output = interpreter->output(0);
   // 打印输入张量信息
-  Serial.printf("\n input->dims->size = %d \n", input->dims->size);
-  Serial.printf("\nthe model input shape is (%d, %d, %d, %d)\n",input->dims->data[0], input->dims->data[1], input->dims->data[2], input->dims->data[3]);
+  Serial.printf("\ninput->dims->size = %d \n", input->dims->size);
+  Serial.printf("the model input shape is (%d, %d, %d, %d)\n",input->dims->data[0], input->dims->data[1], input->dims->data[2], input->dims->data[3]);
   //输入数据类型取决于训练所用输入（量化中的uin8 指的是权重)
   if(input->type != kTfLiteFloat32){
     Serial.println("input->type != kTfLiteFloat32");
   }
-  // 确认是.f ???
-  input_buffer = input->data.f;
 
   Serial.println("\n------------------------模型初始化完成------------------------\n\n");
 
@@ -155,15 +141,18 @@ void Task3(void* parameters){
     // 喂狗
     vTaskDelay(1);
 
-    // 计算耗时
+    #ifdef TIME_TEST
+    // 时间测试
     static int task3_temp = 0;
     static int task3_time = 0;
     task3_temp++;
-    if(task3_temp == 61){
-      Serial.printf("\n task3 推断61 次耗时 %d\n", millis() - task3_time);
+    if(task3_temp == WINDOWNUM){
+      Serial.printf("Task3 推断%d 次耗时 %d\n\n", WINDOWNUM, millis() - task3_time);
       task3_temp = 0;
       task3_time = millis();
     }
+    #endif
+
   }
 
 }
