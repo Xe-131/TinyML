@@ -1,8 +1,8 @@
 import re
 
 # 文件路径
-file1_path = r'D:/DOCUMENT/TinyML/Model_Create/MODEL_QUANT_TFLITE_8000.cc'
-file2_path = r'D:/DOCUMENT/TinyML/ESP_Arduino_learn/formal_code/MODEL_QUANT_TFLITE_8000.h'
+file1_path = r'./MODEL_QUANT_TFLITE_8000.cc'
+file2_path = r'../ESP_Arduino_Code/MODEL_QUANT_TFLITE_8000.h'
 
 # 正则表达式，用于匹配（带 const 的）unsigned char 和 unsigned int 变量定义，支持多行
 variable_pattern1 = re.compile(r'(unsigned\s+(char|int)\s+\w+\s*\[\]\s*=\s*\{.*?\};|unsigned\s+(char|int)\s+\w+\s*=\s*[^;]+;)', re.DOTALL)
